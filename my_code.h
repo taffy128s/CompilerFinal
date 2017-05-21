@@ -6,6 +6,7 @@
 
 struct symbol_entry {
     char *name;
+    char *label_name;
     int type;
     int scope;
     char *para_id[64];

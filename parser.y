@@ -31,9 +31,13 @@ int arg_pass_num = 0, arg_types[MAX_ARG_NUM]; // show the argument number in exp
 int now_gen = 0;                // memorize the sector this compiler is generating
 int above_and_include_setup = 1;// show _Z5 or _Z4
 int func_def_counter = 0;       // count function definition number
-int label_nums[128];            // label numbers
-int label_used = 0;             // label used
-int label_depth = -1;           // label depth
+int if_label_nums[128];         // "if" label numbers
+int if_label_used = 0;          // "if" label used
+int if_label_depth = -1;        // "if" label depth
+int while_label_nums[128];      // "while" label numbers
+int while_label_used = 0;       // "while" label used
+int while_label_depth = -1;     // "while" label depth
+int logic_label_used = 0;       // "logic" label used
 FILE *f_asm;                    // output file descriptor
 /*
     self-defined functions
@@ -183,14 +187,15 @@ dec_or_def : {
                      now_gen = GEN_TEXT;
                      fprintf(f_asm, "    .text\n");
                  }
-                 fprintf(f_asm, "    .align    1\n");
                  now_label = gen_label();
+                 fprintf(f_asm, "    .align    1\n");
                  fprintf(f_asm, "    .global    %s\n", now_label);
                  fprintf(f_asm, "    .type    %s, @function\n", now_label);
                  fprintf(f_asm, "%s:\n", now_label);
                  fprintf(f_asm, "    push.s    { $lp }\n");
                  fprintf(f_asm, "    addi    $sp, $sp, -400\n");
                  index = look_up_symbol(now_func_id);
+                 table[index].label_name = now_label;
                  for (i = 0; i < table[index].para_num; i++) {
                      install_symbol(table[index].para_id[i], VAR);
                      #ifdef DEBUG_MODE
@@ -200,6 +205,7 @@ dec_or_def : {
                      table[j].scope = cur_scope + 1;
                      table[j].type = table[index].para_type[i];
                      table[j].var_counter = now_local_var_num++;
+                     fprintf(f_asm, "    swi    $r%d, [$sp + (%d)]\n", i, i * 4);
                  }
                  func_def_counter++;
              }
@@ -268,7 +274,7 @@ statement : id
                     exit(1);
                 }
                 // error detection...(type not match)
-                fprintf(f_asm, "    bal %s\n", table[index].name);
+                fprintf(f_asm, "    bal %s\n", table[index].label_name);
             }
           | id '=' expr ';'
             {
@@ -294,33 +300,77 @@ statement : id
           | if_key '(' expr ')' gen_if compound gen_if_lable_with_jump else_key compound gen_if_lable
           | if_key '(' expr ')' gen_if compound gen_if_lable
           | switch_key '(' id ')' '{' cases default_case '}'
-          | while_key '(' expr ')' compound
+          | while_key 
+            {
+                while_label_depth++;
+                while_label_nums[while_label_depth] = while_label_used;
+                while_label_used += 2;
+                fprintf(f_asm, ".W%d:\n", while_label_nums[while_label_depth]);
+            }
+            '(' expr ')' gen_while compound gen_while_end
           | do_key compound while_key '(' expr ')' ';'
           | for_key '(' exprs ';' exprs ';' exprs ')' compound
           | continue_key ';'
           | break_key ';'
           | return_key expr ';'
+          | id plus_plus ';'
+            {
+                // error_detection...
+                int index = look_up_symbol($1);
+                if (index == -1) {
+                    fprintf(stderr, "Error at line %d: symbol not found.\n", lineNum);
+                    exit(1);
+                }
+                fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", table[index].var_counter * 4);
+                fprintf(f_asm, "    addi    $r0, $r0, 1\n");
+                fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", table[index].var_counter * 4);
+            }
+          | id minus_minus ';'
+            {
+                // error detection...
+                int index = look_up_symbol($1);
+                if (index == -1) {
+                    fprintf(stderr, "Error at line %d: symbol not found.\n", lineNum);
+                    exit(1);
+                }
+                fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", table[index].var_counter * 4);
+                fprintf(f_asm, "    subi    $r0, $r0, 1\n");
+                fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", table[index].var_counter * 4);
+            }
           ;
-
+          
+gen_while : {
+                now_stack_pos += 4;
+                fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                fprintf(f_asm, "    beqz    $r0, .W%d\n", while_label_nums[while_label_depth] + 1);
+            }
+          ;
+            
+gen_while_end : {
+                    fprintf(f_asm, "    j    .W%d\n", while_label_nums[while_label_depth]);
+                    fprintf(f_asm, ".W%d:\n", while_label_nums[while_label_depth] + 1);
+                    while_label_depth--;
+                }
+              ;
 gen_if : {
-             label_depth++;
-             label_nums[label_depth] = label_used;
-             label_used += 2;
+             if_label_depth++;
+             if_label_nums[if_label_depth] = if_label_used;
+             if_label_used += 2;
              now_stack_pos += 4;
              fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
-             fprintf(f_asm, "    beqz    $r0, .L%d\n", label_nums[label_depth]);
+             fprintf(f_asm, "    beqz    $r0, .I%d\n", if_label_nums[if_label_depth]);
          }
        ;
 
 gen_if_lable_with_jump : {
-                             fprintf(f_asm, "    j    .L%d\n", label_nums[label_depth] + 1);
-                             fprintf(f_asm, ".L%d:\n", label_nums[label_depth]++);
+                             fprintf(f_asm, "    j    .I%d\n", if_label_nums[if_label_depth] + 1);
+                             fprintf(f_asm, ".I%d:\n", if_label_nums[if_label_depth]++);
                          }
                        ;
 
 gen_if_lable : {
-                   fprintf(f_asm, ".L%d:\n", label_nums[label_depth]++);
-                   label_depth--;
+                   fprintf(f_asm, ".I%d:\n", if_label_nums[if_label_depth]++);
+                   if_label_depth--;
                }
              ;
 
@@ -380,6 +430,19 @@ const_list : const_list ',' const_single
            ;
 
 const_single : id '=' all_constant
+               {
+                   int index;
+                   install_symbol($1, CONST);
+                   #ifdef DEBUG_MODE
+                   printf("______one symbol is installed, scope: %d, count: %d\n", cur_scope, now_local_var_num);
+                   #endif
+                   index = look_up_symbol($1);
+                   now_stack_pos += 4;
+                   fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                   fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_local_var_num * 4);
+                   table[index].var_counter = now_local_var_num;
+                   now_local_var_num++;
+               }
              ;
 
 all_constant : int_constant
@@ -454,14 +517,116 @@ single_one : id
            ;
 
 expr : expr or_or expr
+       {
+           now_stack_pos += 4;
+           fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+           fprintf(f_asm, "    bnez    $r0, .L%d\n", logic_label_used);
+           now_stack_pos += 4;
+           fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+           fprintf(f_asm, "    beqz    $r0, .L%d\n", logic_label_used + 1);
+           fprintf(f_asm, ".L%d:\n", logic_label_used);
+           fprintf(f_asm, "    movi    $r0, 1\n");
+           fprintf(f_asm, "    j    .L%d\n", logic_label_used + 2);
+           fprintf(f_asm, ".L%d:\n", logic_label_used + 1);
+           fprintf(f_asm, "    movi    $r0, 0\n");
+           fprintf(f_asm, ".L%d:\n", logic_label_used + 2);
+           fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+           now_stack_pos -= 4;
+           logic_label_used += 3;
+       }
      | expr and_and expr
+       {
+           now_stack_pos += 4;
+           fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+           fprintf(f_asm, "    beqz    $r0, .L%d\n", logic_label_used);
+           now_stack_pos += 4;
+           fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+           fprintf(f_asm, "    beqz    $r0, .L%d\n", logic_label_used);
+           fprintf(f_asm, "    movi    $r0, 1\n");
+           fprintf(f_asm, "    j    .L%d\n", logic_label_used + 1);
+           fprintf(f_asm, ".L%d:\n", logic_label_used);
+           fprintf(f_asm, "    movi    $r0, 0\n");
+           fprintf(f_asm, ".L%d:\n", logic_label_used + 1);
+           fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+           now_stack_pos -= 4;
+           logic_label_used += 2;
+       }
      | '!' expr
+       {
+           now_stack_pos += 4;
+           fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+           fprintf(f_asm, "    slti    $r0, $r0, 1\n");
+           fprintf(f_asm, "    zeb    $r0, $r0\n");
+           fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+           now_stack_pos -= 4;  
+       }
      | expr '<' expr
+       {
+           now_stack_pos += 4;
+           fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
+           now_stack_pos += 4;
+           fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+           fprintf(f_asm, "    slts    $r0, $r0, $r1\n");
+           fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+           now_stack_pos -= 4;  
+       }
      | expr '>' expr
+       {
+           now_stack_pos += 4;
+           fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
+           now_stack_pos += 4;
+           fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+           fprintf(f_asm, "    slts    $r0, $r1, $r0\n");
+           fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+           now_stack_pos -= 4; 
+       }
      | expr less_equal expr
+       {
+           now_stack_pos += 4;
+           fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
+           now_stack_pos += 4;
+           fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+           fprintf(f_asm, "    slts    $r0, $r1, $r0\n");
+           fprintf(f_asm, "    xori    $r0, $r0, 1\n");
+           fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+           now_stack_pos -= 4;  
+       }
      | expr bigger_equal expr
+       {
+           now_stack_pos += 4;
+           fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
+           now_stack_pos += 4;
+           fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+           fprintf(f_asm, "    slts    $r0, $r0, $r1\n");
+           fprintf(f_asm, "    xori    $r0, $r0, 1\n");
+           fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+           now_stack_pos -= 4;  
+       }
      | expr equal_equal expr
+       {
+           now_stack_pos += 4;
+           fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
+           now_stack_pos += 4;
+           fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+           fprintf(f_asm, "    sub    $r0, $r0, $r1\n");
+           fprintf(f_asm, "    slti    $r0, $r0, 1\n");
+           fprintf(f_asm, "    zeb    $r0, $r0\n");
+           fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+           now_stack_pos -= 4;
+       }
      | expr not_equal expr
+       {
+         now_stack_pos += 4;
+         fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
+         now_stack_pos += 4;
+         fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+         fprintf(f_asm, "    sub    $r0, $r0, $r1\n");
+         fprintf(f_asm, "    movi    $r1, 0\n");
+         fprintf(f_asm, "    slt    $r0, $r1, $r0\n");
+         fprintf(f_asm, "    zeb    $r0, $r0\n");
+         fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+         now_stack_pos -= 4;
+       }
      | expr '+' expr
        {
            now_stack_pos += 4;
@@ -503,11 +668,43 @@ expr : expr or_or expr
            now_stack_pos -= 4;
        }
      | expr '%' expr
+       {
+           now_stack_pos += 4;
+           fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
+           now_stack_pos += 4;
+           fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+           fprintf(f_asm, "    divsr    $r0, $r1, $r0, $r1\n");
+           fprintf(f_asm, "    swi    $r1, [$sp + (%d)]\n", now_stack_pos);
+           now_stack_pos -= 4;
+       }
      | '-' expr %prec uminus
+       {
+           now_stack_pos += 4;
+           fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
+           fprintf(f_asm, "    movi    $r0, 0\n");
+           fprintf(f_asm, "    sub    $r0, $r0, $r1\n");
+           fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+           now_stack_pos -= 4;  
+       }
      | expr plus_plus
+       {
+           now_stack_pos += 4;
+           fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+           fprintf(f_asm, "    addi    $r0, $r0, 1\n");
+           fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+           now_stack_pos -= 4;
+       }
      | expr minus_minus
+       {
+           now_stack_pos += 4;
+           fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+           fprintf(f_asm, "    subi    $r0, $r0, 1\n");
+           fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+           now_stack_pos -= 4;  
+       }
      | id
        {
+           // $$ = expr_type...
            int index = look_up_symbol($1);
            if (index == -1) {
                fprintf(stderr, "Error at line %d: symbol not found.\n", lineNum);
@@ -518,6 +715,10 @@ expr : expr or_or expr
            now_stack_pos -= 4;
        }
      | id arr_dim_expr
+       {
+           fprintf(stderr, "Error at line %d: not allowed type.\n", lineNum);
+           exit(1);  
+       }
      | int_constant
        {
            // $$ = expr_type...
@@ -526,19 +727,115 @@ expr : expr or_or expr
            now_stack_pos -= 4;
        }
      | char_constant
+       {
+           fprintf(stderr, "Error at line %d: not allowed type.\n", lineNum);
+           exit(1);  
+       }
      | double_constant
+       {
+           // $$ = expr_type...
+       }
      | other_constant
+       {
+           fprintf(stderr, "Error at line %d: not allowed type.\n", lineNum);
+           exit(1);  
+       }
      | id '(' exprs ')'
+       {
+           // $$ = expr_type...  
+       }
      | '(' expr ')'
+       {
+           // $$ = expr_type...  
+       }
      ;
 
 expr_with_no_func_call : expr_with_no_func_call or_or expr_with_no_func_call
+                         {
+                             now_stack_pos += 4;
+                             fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                             fprintf(f_asm, "    bnez    $r0, .L%d\n", logic_label_used);
+                             now_stack_pos += 4;
+                             fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                             fprintf(f_asm, "    beqz    $r0, .L%d\n", logic_label_used + 1);
+                             fprintf(f_asm, ".L%d:\n", logic_label_used);
+                             fprintf(f_asm, "    movi    $r0, 1\n");
+                             fprintf(f_asm, "    j    .L%d\n", logic_label_used + 2);
+                             fprintf(f_asm, ".L%d:\n", logic_label_used + 1);
+                             fprintf(f_asm, "    movi    $r0, 0\n");
+                             fprintf(f_asm, ".L%d:\n", logic_label_used + 2);
+                             fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                             now_stack_pos -= 4;
+                             logic_label_used += 3;
+                         }
                        | expr_with_no_func_call and_and expr_with_no_func_call
-                       | '!' expr_with_no_func_call
+                         {
+                             now_stack_pos += 4;
+                             fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                             fprintf(f_asm, "    beqz    $r0, .L%d\n", logic_label_used);
+                             now_stack_pos += 4;
+                             fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                             fprintf(f_asm, "    beqz    $r0, .L%d\n", logic_label_used);
+                             fprintf(f_asm, "    movi    $r0, 1\n");
+                             fprintf(f_asm, "    j    .L%d\n", logic_label_used + 1);
+                             fprintf(f_asm, ".L%d:\n", logic_label_used);
+                             fprintf(f_asm, "    movi    $r0, 0\n");
+                             fprintf(f_asm, ".L%d:\n", logic_label_used + 1);
+                             fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                             now_stack_pos -= 4;
+                             logic_label_used += 2;
+                         }
+                       | '!' expr_with_no_func_call 
+                         {
+                             now_stack_pos += 4;
+                             fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                             fprintf(f_asm, "    slti    $r0, $r0, 1\n");
+                             fprintf(f_asm, "    zeb    $r0, $r0\n");
+                             fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                             now_stack_pos -= 4;
+                         }
                        | expr_with_no_func_call '<' expr_with_no_func_call
+                         {
+                             now_stack_pos += 4;
+                             fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
+                             now_stack_pos += 4;
+                             fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                             fprintf(f_asm, "    slts    $r0, $r0, $r1\n");
+                             fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                             now_stack_pos -= 4;
+                         }
                        | expr_with_no_func_call '>' expr_with_no_func_call
+                         {
+                             now_stack_pos += 4;
+                             fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
+                             now_stack_pos += 4;
+                             fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                             fprintf(f_asm, "    slts    $r0, $r1, $r0\n");
+                             fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                             now_stack_pos -= 4; 
+                         }
                        | expr_with_no_func_call less_equal expr_with_no_func_call
+                         {
+                             now_stack_pos += 4;
+                             fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
+                             now_stack_pos += 4;
+                             fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                             fprintf(f_asm, "    slts    $r0, $r1, $r0\n");
+                             fprintf(f_asm, "    xori    $r0, $r0, 1\n");
+                             fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                             now_stack_pos -= 4;
+                         }
                        | expr_with_no_func_call bigger_equal expr_with_no_func_call
+                         {
+                             now_stack_pos += 4;
+                             fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
+                             now_stack_pos += 4;
+                             fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                             fprintf(f_asm, "    slts    $r0, $r0, $r1\n");
+                             fprintf(f_asm, "    xori    $r0, $r0, 1\n");
+                             fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                             now_stack_pos -= 4;
+                         }
                        | expr_with_no_func_call equal_equal expr_with_no_func_call
                          {
                              now_stack_pos += 4;
@@ -642,6 +939,14 @@ expr_with_no_func_call : expr_with_no_func_call or_or expr_with_no_func_call
                        | id
                          {
                              // $$ = expr_type...
+                             int index = look_up_symbol($1);
+                             if (index == -1) {
+                                 fprintf(stderr, "Error at line %d: symbol not found.\n", lineNum);
+                                 exit(1);
+                             }
+                             fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", table[index].var_counter * 4);
+                             fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                             now_stack_pos -= 4;
                          }
                        | id arr_dim_expr_with_no_func_call
                          {
@@ -725,15 +1030,18 @@ int main() {
     index = look_up_symbol("pinMode");
     table[index].para_type[table[index].var_counter++] = int_type;
     table[index].para_type[table[index].var_counter++] = int_type;
+    table[index].label_name = (char *) copys("pinMode");
     //---//
     install_symbol("digitalWrite", FUNC);
     index = look_up_symbol("digitalWrite");
     table[index].para_type[table[index].var_counter++] = int_type;
     table[index].para_type[table[index].var_counter++] = int_type;
+    table[index].label_name = (char *) copys("digitalWrite");
     //---//
     install_symbol("delay", FUNC);
     index = look_up_symbol("delay");
     table[index].para_type[table[index].var_counter++] = int_type;
+    table[index].label_name = (char *) copys("delay");
     //---//
     gen_assembly_header();
     yyparse();
