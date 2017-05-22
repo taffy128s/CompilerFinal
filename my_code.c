@@ -29,12 +29,14 @@ void install_symbol(char *s, int status) {
     if (cur_counter >= MAX_TABLE_SIZE) {
         fprintf(stderr, "Symbol table is full.\n");
     } else {
-        table[cur_counter].scope = cur_scope;
-        table[cur_counter].type = now_dec_type;
         table[cur_counter].name = copys(s);
-        table[cur_counter].defined_function = 0;
+        table[cur_counter].label_name = 0;
+        table[cur_counter].type = now_dec_type;
+        table[cur_counter].scope = cur_scope;
         table[cur_counter].para_num = 0;
+        table[cur_counter].defined_function = 0;
         table[cur_counter].status = status;
+        table[cur_counter].var_offset = 0;
         cur_counter++;
     }
 }

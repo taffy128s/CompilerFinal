@@ -14,7 +14,7 @@ struct symbol_entry {
     int para_num;
     int defined_function;
     int status;
-    int var_counter;
+    int var_offset;
 } table[MAX_TABLE_SIZE];
 
 extern int cur_scope, cur_counter;

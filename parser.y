@@ -37,7 +37,9 @@ int if_label_depth = -1;        // "if" label depth
 int while_label_nums[128];      // "while" label numbers
 int while_label_used = 0;       // "while" label used
 int while_label_depth = -1;     // "while" label depth
+int switch_depth = -1;          // "switch" depth
 int logic_label_used = 0;       // "logic" label used
+int last_is_return = 0;         // last statment is return
 FILE *f_asm;                    // output file descriptor
 /*
     self-defined functions
@@ -88,7 +90,7 @@ char *gen_label() {
 
 %type <integer> int_constant
 %type <ident> id
-%type <expr_type> int_type double_type bool_type char_type void_type expr_with_no_func_call expr
+%type <expr_type> int_type double_type bool_type char_type void_type expr_with_no_func_call expr all_constant
 
 %left or_or
 %left and_and
@@ -149,7 +151,7 @@ func : non_void_type id
            install_symbol($2, FUNC);
            now_func_id = (char *) copys($2);
            #ifdef DEBUG_MODE
-           printf("______now_func_id: %s, and is installed in scope %d\n", now_func_id, cur_scope);
+           printf("______now_func_id: %s, and is installed in scope %d, cur_count: %d\n", now_func_id, cur_scope, cur_counter);
            #endif
        }
        '(' paras ')' dec_or_def
@@ -181,7 +183,44 @@ dec_or_def : {
              }
              ';'
            | {
-                 // Error detection...
+                 if (have_declared(now_func_id) == 1) {
+                     cur_counter--;
+                     int i;
+                     for (i = cur_counter - 2; i >= 0; i--) {
+                         if (!strcmp(now_func_id, table[i].name))
+                             break;
+                     }
+                     if (table[i].status != FUNC) {
+                         fprintf(stderr, "Error at line %d: multiple declaration.\n", lineNum);
+                         exit(1);
+                     } else if (table[i].defined_function == 1) {
+                         fprintf(stderr, "Error at line %d: multiple definition.\n", lineNum);
+                         exit(1);
+                     } else {
+                         int j;
+                         if (table[i].type != table[cur_counter].type) {
+                             fprintf(stderr, "Error at line %d: function definition type not matched.\n", lineNum);
+                             exit(1);
+                         }
+                         if (table[i].para_num != table[cur_counter].para_num) {
+                             fprintf(stderr, "Error at line %d: param count not matched.\n", lineNum);
+                             exit(1);
+                         }
+                         for (j = 0; j < table[i].para_num; j++) {
+                             if (table[i].para_type[j] != table[cur_counter].para_type[j]) {
+                                 fprintf(stderr, "Error at line %d: param type not matched.\n", lineNum);
+                                 exit(1);
+                             }
+                             if (strcmp(table[i].para_id[j], table[cur_counter].para_id[j])) {
+                                 fprintf(stderr, "Error at line %d: param id not matched.\n", lineNum);
+                                 exit(1);
+                             }
+                         }
+                     }
+                     #ifdef DEBUG_MODE
+                     printf("_____function definition detected, cur_counter is changed to %d\n", cur_counter);
+                     #endif
+                 }
                  int i, j, index;
                  now_local_var_num = 0;
                  now_stack_pos = 392;
@@ -198,6 +237,7 @@ dec_or_def : {
                  fprintf(f_asm, "    addi    $sp, $sp, -400\n");
                  index = look_up_symbol(now_func_id);
                  table[index].label_name = now_label;
+                 table[index].defined_function = 1;
                  for (i = 0; i < table[index].para_num; i++) {
                      install_symbol(table[index].para_id[i], VAR);
                      #ifdef DEBUG_MODE
@@ -206,13 +246,19 @@ dec_or_def : {
                      j = look_up_symbol(table[index].para_id[i]);
                      table[j].scope = cur_scope + 1;
                      table[j].type = table[index].para_type[i];
-                     table[j].var_counter = now_local_var_num++;
+                     table[j].var_offset = now_local_var_num++;
                      fprintf(f_asm, "    swi    $r%d, [$sp + (%d)]\n", i, i * 4);
                  }
+                 last_is_return = 0;
                  func_def_counter++;
              }
              compound
              {
+                 int index = look_up_symbol(now_func_id);
+                 if (table[index].type != void_type && last_is_return == 0) {
+                     fprintf(stderr, "Error at line %d: last statement is not return.\n", lineNum);
+                     exit(1);
+                 }
                  fprintf(f_asm, "    addi    $sp, $sp, 400\n");
                  fprintf(f_asm, "    pop.s    { $lp }\n");
                  fprintf(f_asm, "    ret\n");
@@ -275,7 +321,7 @@ statement : id
                 for (i = 0; i < arg_pass_num; i++) {
                     if (arg_type[i] != table[index].para_type[i]) {
                         fprintf(stderr, "Error at line %d: argument type not matched.\n", lineNum);
-                    exit(1);
+                        exit(1);
                     }
                 }
                 #ifdef DEBUG_MODE
@@ -286,6 +332,7 @@ statement : id
                     fprintf(f_asm, "    lwi    $r%d, [$sp + (%d)]\n", i, now_stack_pos);
                 }
                 fprintf(f_asm, "    bal %s\n", table[index].label_name);
+                last_is_return = 0;
             }
           | id '=' expr ';'
             {
@@ -299,12 +346,17 @@ statement : id
                     fprintf(stderr, "Error at line %d: cannot assign value to a non-var id.\n", lineNum);
                     exit(1);
                 }
+                if (table[index].type != $3) {
+                    fprintf(stderr, "Error at line %d: type not matched.\n", lineNum);
+                    exit(1);
+                }
                 #ifdef DEBUG_MODE
-                printf("______id %s is at local place %d\n", $1, table[index].var_counter);
+                printf("______id %s is at local place %d\n", $1, table[index].var_offset);
                 #endif
                 now_stack_pos += 4;
                 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
-                fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", table[index].var_counter * 4);
+                fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", table[index].var_offset * 4);
+                last_is_return = 0;
             }
           | id arr_dim_expr '=' expr ';'
             {
@@ -313,8 +365,22 @@ statement : id
             }
           | compound
           | if_key '(' expr ')' gen_if compound gen_if_lable_with_jump else_key compound gen_if_lable
+            {
+                last_is_return = 0;  
+            }
           | if_key '(' expr ')' gen_if compound gen_if_lable
-          | switch_key '(' id ')' '{' cases default_case '}'
+            {
+                last_is_return = 0;  
+            }
+          | switch_key 
+            {
+                switch_depth++;  
+            }
+            '(' id ')' '{' cases default_case '}'
+            {
+                switch_depth--;
+                last_is_return = 0;      
+            }
           | while_key 
             {
                 while_label_depth++;
@@ -323,11 +389,46 @@ statement : id
                 fprintf(f_asm, ".W%d:\n", while_label_nums[while_label_depth]);
             }
             '(' expr ')' gen_while compound gen_while_end
+            {
+                last_is_return = 0;
+            }
           | do_key compound while_key '(' expr ')' ';'
+            {
+                last_is_return = 0;  
+            }
           | for_key '(' exprs ';' exprs ';' exprs ')' compound
+            {
+                last_is_return = 0;  
+            }
           | continue_key ';'
+            {
+                if (while_label_depth == -1) {
+                    fprintf(stderr, "Error at line %d: keyword continue is not in any loop.\n", lineNum);
+                    exit(1);
+                }
+                last_is_return = 0;  
+            }
           | break_key ';'
+            {
+                if (while_label_depth == -1 && switch_depth == -1) {
+                    fprintf(stderr, "Error at line %d: keyword break is not in any loop or switch statement.\n", lineNum);
+                    exit(1);
+                }
+                last_is_return = 0;  
+            }
           | return_key expr ';'
+            {
+                int index = look_up_symbol(now_func_id);
+                if (table[index].type == void_type) {
+                    fprintf(stderr, "Error at line %d: void with return statement.\n", lineNum);
+                    exit(1);
+                }
+                if (table[index].type != $2) {
+                    fprintf(stderr, "Error at line %d: return type not matched.\n", lineNum);
+                    exit(1);
+                }
+                last_is_return = 1;
+            }
           | id plus_plus ';'
             {
                 int index = look_up_symbol($1);
@@ -339,9 +440,10 @@ statement : id
                     fprintf(stderr, "Error at line %d: cannot assign value to a non-var id.\n", lineNum);
                     exit(1);
                 }
-                fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", table[index].var_counter * 4);
+                fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", table[index].var_offset * 4);
                 fprintf(f_asm, "    addi    $r0, $r0, 1\n");
-                fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", table[index].var_counter * 4);
+                fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", table[index].var_offset * 4);
+                last_is_return = 0;
             }
           | id minus_minus ';'
             {
@@ -354,9 +456,10 @@ statement : id
                     fprintf(stderr, "Error at line %d: cannot assign value to a non-var id.\n", lineNum);
                     exit(1);
                 }
-                fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", table[index].var_counter * 4);
+                fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", table[index].var_offset * 4);
                 fprintf(f_asm, "    subi    $r0, $r0, 1\n");
-                fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", table[index].var_counter * 4);
+                fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", table[index].var_offset * 4);
+                last_is_return = 0;
             }
           ;
           
@@ -465,6 +568,10 @@ const_single : id '=' all_constant
                        fprintf(stderr, "Error at line %d: multiple definition.\n", lineNum);
                        exit(1);
                    }
+                   if (now_dec_type != $3) {
+                       fprintf(stderr, "Error at line %d: type not matched.\n", lineNum);
+                       exit(1);
+                   }
                    install_symbol($1, CONST);
                    #ifdef DEBUG_MODE
                    printf("______one symbol is installed, scope: %d, count: %d\n", cur_scope, now_local_var_num);
@@ -473,14 +580,31 @@ const_single : id '=' all_constant
                    now_stack_pos += 4;
                    fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
                    fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_local_var_num * 4);
-                   table[index].var_counter = now_local_var_num++;
+                   table[index].var_offset = now_local_var_num++;
                }
              ;
 
 all_constant : int_constant
+               {
+                   fprintf(f_asm, "    movi    $r0, %d\n", $1);
+                   fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                   now_stack_pos -= 4;
+                   $$ = int_type;
+               }
              | char_constant
+               {
+                   fprintf(stderr, "Error at line %d: not allowed type.\n", lineNum);
+                   exit(1);
+               }
              | double_constant
+               {
+                   $$ = double_type;  
+               }
              | other_constant
+               {
+                   fprintf(stderr, "Error at line %d: not allowed type.\n", lineNum);
+                   exit(1);
+               }
              ;
 
 var_dec : non_void_type var_list ';'
@@ -533,13 +657,17 @@ single_one : id
                  printf("______one symbol is installed, scope: %d, count: %d\n", cur_scope, now_local_var_num);
                  #endif
                  index = look_up_symbol($1);
-                 table[index].var_counter = now_local_var_num++;
+                 table[index].var_offset = now_local_var_num++;
              }
            | id '=' expr_with_no_func_call
              {
                  int index = look_up_symbol($1);
                  if (index >= 0) {
                      fprintf(stderr, "Error at line %d: multiple definition.\n", lineNum);
+                     exit(1);
+                 }
+                 if (now_dec_type != $3) {
+                     fprintf(stderr, "Error at line %d: type not matched.\n", lineNum);
                      exit(1);
                  }
                  install_symbol($1, VAR);
@@ -550,7 +678,7 @@ single_one : id
                  now_stack_pos += 4;
                  fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
                  fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_local_var_num * 4);
-                 table[index].var_counter = now_local_var_num++;
+                 table[index].var_offset = now_local_var_num++;
              }
            ;
 
@@ -808,7 +936,11 @@ expr : expr or_or expr
                fprintf(stderr, "Error at line %d: symbol not found.\n", lineNum);
                exit(1);
            }
-           fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", table[index].var_counter * 4);
+           if (table[index].type != int_type && table[index].type != double_type) {
+               fprintf(stderr, "Error at line %d: not allowed type.\n", lineNum);
+               exit(1);
+           }
+           fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", table[index].var_offset * 4);
            fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
            now_stack_pos -= 4;
            $$ = table[index].type;
@@ -1128,7 +1260,11 @@ expr_with_no_func_call : expr_with_no_func_call or_or expr_with_no_func_call
                                  fprintf(stderr, "Error at line %d: symbol not found.\n", lineNum);
                                  exit(1);
                              }
-                             fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", table[index].var_counter * 4);
+                             if (table[index].type != int_type && table[index].type != double_type) {
+                                 fprintf(stderr, "Error at line %d: not allowed type.\n", lineNum);
+                                 exit(1);
+                             }
+                             fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", table[index].var_offset * 4);
                              fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
                              now_stack_pos -= 4;
                              $$ = table[index].type;
