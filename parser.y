@@ -350,12 +350,15 @@ statement : id
                     fprintf(stderr, "Error at line %d: type not matched.\n", lineNum);
                     exit(1);
                 }
-                #ifdef DEBUG_MODE
-                printf("______id %s is at local place %d\n", $1, table[index].var_offset);
-                #endif
-                now_stack_pos += 4;
-                fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
-                fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", table[index].var_offset * 4);
+                if (table[index].scope == 0) {
+                    now_stack_pos += 4;
+                    fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                    fprintf(f_asm, "    swi.gp    $r0, [ + %s]\n", table[index].name);
+                } else {
+                    now_stack_pos += 4;
+                    fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                    fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", table[index].var_offset * 4);
+                }
                 last_is_return = 0;
             }
           | id arr_dim_expr '=' expr ';'
@@ -427,6 +430,11 @@ statement : id
                     fprintf(stderr, "Error at line %d: return type not matched.\n", lineNum);
                     exit(1);
                 }
+                now_stack_pos += 4;
+                fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                fprintf(f_asm, "    addi    $sp, $sp, 400\n");
+                fprintf(f_asm, "    pop.s    { $lp }\n");
+                fprintf(f_asm, "    ret\n");
                 last_is_return = 1;
             }
           | id plus_plus ';'
@@ -440,9 +448,15 @@ statement : id
                     fprintf(stderr, "Error at line %d: cannot assign value to a non-var id.\n", lineNum);
                     exit(1);
                 }
-                fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", table[index].var_offset * 4);
-                fprintf(f_asm, "    addi    $r0, $r0, 1\n");
-                fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", table[index].var_offset * 4);
+                if (table[index].scope == 0) {
+                    fprintf(f_asm, "    lwi.gp    $r0, [ + %s]\n", table[index].name);
+                    fprintf(f_asm, "    addi    $r0, $r0, 1\n");
+                    fprintf(f_asm, "    swi.gp    $r0, [ + %s]\n", table[index].name);
+                } else {
+                    fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", table[index].var_offset * 4);
+                    fprintf(f_asm, "    addi    $r0, $r0, 1\n");
+                    fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", table[index].var_offset * 4);
+                }
                 last_is_return = 0;
             }
           | id minus_minus ';'
@@ -456,9 +470,15 @@ statement : id
                     fprintf(stderr, "Error at line %d: cannot assign value to a non-var id.\n", lineNum);
                     exit(1);
                 }
-                fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", table[index].var_offset * 4);
-                fprintf(f_asm, "    subi    $r0, $r0, 1\n");
-                fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", table[index].var_offset * 4);
+                if (table[index].scope == 0) {
+                    fprintf(f_asm, "    lwi.gp    $r0, [ + %s]\n", table[index].name);
+                    fprintf(f_asm, "    subi    $r0, $r0, 1\n");
+                    fprintf(f_asm, "    swi.gp    $r0, [ + %s]\n", table[index].name);
+                } else {
+                    fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", table[index].var_offset * 4);
+                    fprintf(f_asm, "    subi    $r0, $r0, 1\n");
+                    fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", table[index].var_offset * 4);
+                }
                 last_is_return = 0;
             }
           ;
@@ -577,10 +597,14 @@ const_single : id '=' all_constant
                    printf("______one symbol is installed, scope: %d, count: %d\n", cur_scope, now_local_var_num);
                    #endif
                    index = look_up_symbol($1);
-                   now_stack_pos += 4;
-                   fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
-                   fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_local_var_num * 4);
-                   table[index].var_offset = now_local_var_num++;
+                   if (table[index].scope == 0) {
+                       fprintf(stderr, "______not supporting constant in global scope.\n");
+                   } else {
+                       now_stack_pos += 4;
+                       fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                       fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_local_var_num * 4);
+                       table[index].var_offset = now_local_var_num++;
+                   }
                }
              ;
 
@@ -657,7 +681,24 @@ single_one : id
                  printf("______one symbol is installed, scope: %d, count: %d\n", cur_scope, now_local_var_num);
                  #endif
                  index = look_up_symbol($1);
-                 table[index].var_offset = now_local_var_num++;
+                 if (table[index].scope == 0) {
+                     if (now_dec_type == int_type) {
+                         fprintf(f_asm, "    .global %s\n", $1);
+                         if (now_gen != GEN_BSS) {
+                             now_gen = GEN_BSS;
+                             fprintf(f_asm, "    .section    .bss\n");
+                         }
+                         fprintf(f_asm, "    .align    2\n");
+                         fprintf(f_asm, "    .type    %s, @object\n", $1);
+                         fprintf(f_asm, "    .size    %s, 4\n", $1);
+                         fprintf(f_asm, "%s:\n", $1);
+                         fprintf(f_asm, "    .zero    4\n");
+                     } else {
+                         fprintf(stderr, "______only generate global assembly of int_type.\n");
+                     }
+                 } else {
+                     table[index].var_offset = now_local_var_num++;
+                 }
              }
            | id '=' expr_with_no_func_call
              {
@@ -675,10 +716,14 @@ single_one : id
                  printf("______one symbol is installed, scope: %d, count: %d\n", cur_scope, now_local_var_num);
                  #endif
                  index = look_up_symbol($1);
-                 now_stack_pos += 4;
-                 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
-                 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_local_var_num * 4);
-                 table[index].var_offset = now_local_var_num++;
+                 if (table[index].scope == 0) {
+                     fprintf(stderr, "______global var can't be initialized by expr.\n");
+                 } else {
+                     now_stack_pos += 4;
+                     fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                     fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_local_var_num * 4);
+                     table[index].var_offset = now_local_var_num++;
+                 }
              }
            ;
 
@@ -940,9 +985,15 @@ expr : expr or_or expr
                fprintf(stderr, "Error at line %d: not allowed type.\n", lineNum);
                exit(1);
            }
-           fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", table[index].var_offset * 4);
-           fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
-           now_stack_pos -= 4;
+           if (table[index].scope == 0) {
+               fprintf(f_asm, "    lwi.gp    $r0, [ + %s]\n", table[index].name);
+               fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+               now_stack_pos -= 4;
+           } else {
+               fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", table[index].var_offset * 4);
+               fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+               now_stack_pos -= 4;
+           }
            $$ = table[index].type;
        }
      | id arr_dim_expr
@@ -971,7 +1022,11 @@ expr : expr or_or expr
            fprintf(stderr, "Error at line %d: not allowed type.\n", lineNum);
            exit(1);  
        }
-     | id '(' exprs ')'
+     | id 
+       {
+           arg_pass_num = 0;
+       }
+       '(' exprs ')'
        {
            int i, index = look_up_symbol($1);
            if (index == -1 || table[index].status != FUNC) {
@@ -982,10 +1037,14 @@ expr : expr or_or expr
                fprintf(stderr, "Error at line %d: not allowed type.\n", lineNum);
                exit(1);  
            }
+           if (arg_pass_num != table[index].para_num) {
+               fprintf(stderr, "Error at line %d: argument number not matched.\n", lineNum);
+               exit(1);
+           }
            for (i = 0; i < arg_pass_num; i++) {
                if (arg_type[i] != table[index].para_type[i]) {
                    fprintf(stderr, "Error at line %d: argument type not matched.\n", lineNum);
-               exit(1);
+                   exit(1);
                }
            }
            #ifdef DEBUG_MODE
@@ -1264,9 +1323,15 @@ expr_with_no_func_call : expr_with_no_func_call or_or expr_with_no_func_call
                                  fprintf(stderr, "Error at line %d: not allowed type.\n", lineNum);
                                  exit(1);
                              }
-                             fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", table[index].var_offset * 4);
-                             fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
-                             now_stack_pos -= 4;
+                             if (table[index].scope == 0) {
+                                 fprintf(f_asm, "    lwi.gp    $r0, [ + %s]\n", table[index].name);
+                                 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 now_stack_pos -= 4;
+                             } else {
+                                 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", table[index].var_offset * 4);
+                                 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 now_stack_pos -= 4;
+                             }
                              $$ = table[index].type;
                          }
                        | id arr_dim_expr_with_no_func_call

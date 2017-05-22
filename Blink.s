@@ -27,6 +27,13 @@
     ! ------------------------------------
     ! Cache block size    : 16
     ! ------------------------------------
+    .global glob_a
+    .section    .bss
+    .align    2
+    .type    glob_a, @object
+    .size    glob_a, 4
+glob_a:
+    .zero    4
     .text
     .align    1
     .global    _Z5setupv
@@ -46,37 +53,73 @@ _Z5setupv:
     ret
     .size    _Z5setupv, .-_Z5setupv
     .align    1
-    .global    _Z4loopv
-    .type    _Z4loopv, @function
-_Z4loopv:
+    .global    _Z4addi
+    .type    _Z4addi, @function
+_Z4addi:
     push.s    { $lp }
     addi    $sp, $sp, -400
-    movi    $r0, 1
-    swi    $r0, [$sp + (392)]
-    lwi    $r0, [$sp + (392)]
     swi    $r0, [$sp + (0)]
-.W0:
-    lwi    $r0, [$sp + (0)]
-    swi    $r0, [$sp + (392)]
-    movi    $r0, 10
-    swi    $r0, [$sp + (388)]
-    lwi    $r1, [$sp + (388)]
-    lwi    $r0, [$sp + (392)]
-    slts    $r0, $r0, $r1
-    swi    $r0, [$sp + (392)]
-    lwi    $r0, [$sp + (392)]
-    beqz    $r0, .W1
-    movi    $r0, 0
+    movi    $r0, 2000
     swi    $r0, [$sp + (392)]
     lwi    $r0, [$sp + (392)]
     swi    $r0, [$sp + (4)]
-    lwi    $r0, [$sp + (0)]
+    lwi.gp    $r0, [ + glob_a]
     swi    $r0, [$sp + (392)]
     movi    $r0, 1000
     swi    $r0, [$sp + (388)]
     lwi    $r1, [$sp + (388)]
     lwi    $r0, [$sp + (392)]
-    mul    $r0, $r0, $r1
+    add    $r0, $r0, $r1
+    swi    $r0, [$sp + (392)]
+    lwi    $r0, [$sp + (392)]
+    swi.gp    $r0, [ + glob_a]
+    lwi.gp    $r0, [ + glob_a]
+    swi    $r0, [$sp + (392)]
+    movi    $r0, 8000
+    swi    $r0, [$sp + (388)]
+    lwi    $r1, [$sp + (388)]
+    lwi    $r0, [$sp + (392)]
+    sub    $r0, $r0, $r1
+    slti    $r0, $r0, 1
+    zeb    $r0, $r0
+    swi    $r0, [$sp + (392)]
+    lwi    $r0, [$sp + (392)]
+    beqz    $r0, .I0
+    lwi    $r0, [$sp + (0)]
+    swi    $r0, [$sp + (392)]
+    lwi    $r0, [$sp + (392)]
+    swi.gp    $r0, [ + glob_a]
+.I0:
+    lwi    $r0, [$sp + (4)]
+    swi    $r0, [$sp + (392)]
+    movi    $r0, 1000
+    swi    $r0, [$sp + (388)]
+    lwi    $r1, [$sp + (388)]
+    lwi    $r0, [$sp + (392)]
+    add    $r0, $r0, $r1
+    swi    $r0, [$sp + (392)]
+    lwi    $r0, [$sp + (392)]
+    addi    $sp, $sp, 400
+    pop.s    { $lp }
+    ret
+    addi    $sp, $sp, 400
+    pop.s    { $lp }
+    ret
+    .size    _Z4addi, .-_Z4addi
+    .align    1
+    .global    _Z4loopv
+    .type    _Z4loopv, @function
+_Z4loopv:
+    push.s    { $lp }
+    addi    $sp, $sp, -400
+    movi    $r0, 1000
+    swi    $r0, [$sp + (392)]
+    lwi    $r0, [$sp + (392)]
+    swi    $r0, [$sp + (0)]
+    lwi    $r0, [$sp + (0)]
+    swi    $r0, [$sp + (392)]
+    lwi    $r0, [$sp + (392)]
+    bal _Z4addi
     swi    $r0, [$sp + (392)]
     lwi    $r0, [$sp + (392)]
     swi    $r0, [$sp + (4)]
@@ -87,7 +130,7 @@ _Z4loopv:
     lwi    $r1, [$sp + (388)]
     lwi    $r0, [$sp + (392)]
     bal digitalWrite
-    lwi    $r0, [$sp + (4)]
+    lwi.gp    $r0, [ + glob_a]
     swi    $r0, [$sp + (392)]
     lwi    $r0, [$sp + (392)]
     bal delay
@@ -102,11 +145,6 @@ _Z4loopv:
     swi    $r0, [$sp + (392)]
     lwi    $r0, [$sp + (392)]
     bal delay
-    lwi    $r0, [$sp + (0)]
-    addi    $r0, $r0, 1
-    swi    $r0, [$sp + (0)]
-    j    .W0
-.W1:
     addi    $sp, $sp, 400
     pop.s    { $lp }
     ret
