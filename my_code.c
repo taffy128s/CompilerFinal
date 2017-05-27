@@ -35,6 +35,7 @@ void install_symbol(char *s, int status) {
         table[cur_counter].scope = cur_scope;
         table[cur_counter].para_num = 0;
         table[cur_counter].defined_function = 0;
+		table[cur_counter].try_to_invoke = 0;
         table[cur_counter].status = status;
         table[cur_counter].var_offset = 0;
         cur_counter++;
@@ -70,4 +71,14 @@ int have_declared(char *s) {
             return 1;
     }
     return 0;
+}
+
+char *check_func_not_defined() {
+	int i;
+	for (i = cur_counter - 1; i >= 0; i--) {
+		if (table[i].status == FUNC && table[i].defined_function == 0 && table[i].try_to_invoke == 1) {
+			return table[i].name;
+		}
+	}
+	return NULL;
 }

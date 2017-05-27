@@ -11,7 +11,7 @@ void putInBuffer(char *input) {
     for (i = 0; i < len; i++) {
         if (bufferIdx >= MAXLEN) {
             fprintf(stderr, "Buffer overflow!\n");
-            exit(1);
+            exit(-1);
         } else {
             buffer[bufferIdx++] = input[i];
         }
@@ -37,7 +37,7 @@ void printToken(char *type) {
 #[ \t]*pragma[ \t]+token[ \t]+on   {putInBuffer(yytext); tokenOn = 1; BEGIN 0; }
 #[ \t]*pragma[ \t]+token[ \t]+off  {putInBuffer(yytext); tokenOn = 0; BEGIN 0; }
 #[ \t]*include.*                   {putInBuffer(yytext); fprintf(stderr, "______#include detected, but will ignore it\n"); }
-#.*                                {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(1); }
+#.*                                {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(-1); }
 
 void        {printToken("key"); putInBuffer(yytext); return void_type; }
 int         {printToken("key"); putInBuffer(yytext); return int_type; }
@@ -61,47 +61,47 @@ struct      {printToken("key"); putInBuffer(yytext); }
 case        {printToken("key"); putInBuffer(yytext); return case_key; }
 default     {printToken("key"); putInBuffer(yytext); return default_key; }
 
-fclose      {printToken("key"); putInBuffer(yytext); return id; }
-clearerr    {printToken("key"); putInBuffer(yytext); return id; }
-feof        {printToken("key"); putInBuffer(yytext); return id; }
-ferror      {printToken("key"); putInBuffer(yytext); return id; }
-fflush      {printToken("key"); putInBuffer(yytext); return id; }
-fgetpos     {printToken("key"); putInBuffer(yytext); return id; }
-fopen       {printToken("key"); putInBuffer(yytext); return id; }
-fread       {printToken("key"); putInBuffer(yytext); return id; }
-freopen     {printToken("key"); putInBuffer(yytext); return id; }
-fseek       {printToken("key"); putInBuffer(yytext); return id; }
-fsetpos     {printToken("key"); putInBuffer(yytext); return id; }
-ftell       {printToken("key"); putInBuffer(yytext); return id; }
-fwrite      {printToken("key"); putInBuffer(yytext); return id; }
-remove      {printToken("key"); putInBuffer(yytext); return id; }
-rename      {printToken("key"); putInBuffer(yytext); return id; }
-rewind      {printToken("key"); putInBuffer(yytext); return id; }
-setbuf      {printToken("key"); putInBuffer(yytext); return id; }
-setvbuf     {printToken("key"); putInBuffer(yytext); return id; }
-tmpfile     {printToken("key"); putInBuffer(yytext); return id; }
-tmpnam      {printToken("key"); putInBuffer(yytext); return id; }
-fprintf     {printToken("key"); putInBuffer(yytext); return id; }
-printf      {printToken("key"); putInBuffer(yytext); return id; }
-sprintf     {printToken("key"); putInBuffer(yytext); return id; }
-vfprintf    {printToken("key"); putInBuffer(yytext); return id; }
-vprintf     {printToken("key"); putInBuffer(yytext); return id; }
-vsprintf    {printToken("key"); putInBuffer(yytext); return id; }
-fscanf      {printToken("key"); putInBuffer(yytext); return id; }
-scanf       {printToken("key"); putInBuffer(yytext); return id; }
-sscanf      {printToken("key"); putInBuffer(yytext); return id; }
-fgetc       {printToken("key"); putInBuffer(yytext); return id; }
-fgets       {printToken("key"); putInBuffer(yytext); return id; }
-fputc       {printToken("key"); putInBuffer(yytext); return id; }
-fputs       {printToken("key"); putInBuffer(yytext); return id; }
-getc        {printToken("key"); putInBuffer(yytext); return id; }
-getchar     {printToken("key"); putInBuffer(yytext); return id; }
-gets        {printToken("key"); putInBuffer(yytext); return id; }
-putc        {printToken("key"); putInBuffer(yytext); return id; }
-putchar     {printToken("key"); putInBuffer(yytext); return id; }
-puts        {printToken("key"); putInBuffer(yytext); return id; }
-ungetc      {printToken("key"); putInBuffer(yytext); return id; }
-perror      {printToken("key"); putInBuffer(yytext); return id; }
+fclose      {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+clearerr    {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+feof        {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+ferror      {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+fflush      {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+fgetpos     {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+fopen       {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+fread       {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+freopen     {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+fseek       {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+fsetpos     {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+ftell       {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+fwrite      {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+remove      {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+rename      {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+rewind      {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+setbuf      {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+setvbuf     {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+tmpfile     {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+tmpnam      {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+fprintf     {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+printf      {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+sprintf     {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+vfprintf    {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+vprintf     {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+vsprintf    {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+fscanf      {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+scanf       {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+sscanf      {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+fgetc       {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+fgets       {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+fputc       {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+fputs       {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+getc        {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+getchar     {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+gets        {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+putc        {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+putchar     {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+puts        {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+ungetc      {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
+perror      {printToken("key"); putInBuffer(yytext); yylval.ident = (char *) copys(yytext); return id; }
 
 [a-zA-Z_][0-9a-zA-Z_]*  {printToken("id"); putInBuffer(yytext); if (!strcmp(yytext, "HIGH") || !strcmp(yytext, "OUTPUT")) {yylval.integer = 1; return int_constant; } else if (!strcmp(yytext, "LOW")) {yylval.integer = 0; return int_constant; } else { yylval.ident = (char *) copys(yytext); return id; } }
 
@@ -135,33 +135,33 @@ perror      {printToken("key"); putInBuffer(yytext); return id; }
 "{"         {printToken("punc"); putInBuffer(yytext); return '{'; }
 "}"         {printToken("punc"); putInBuffer(yytext); return '}'; }
 
-[0][0-9]+                                  {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(1); }
-[0-9]+[a-zA-Z_]+                           {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(1); }
+[0][0-9]+                                  {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(-1); }
+[0-9]+[a-zA-Z_]+                           {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(-1); }
 [0-9]+                                     {printToken("integer"); putInBuffer(yytext); yylval.integer = atoi(yytext); return int_constant; }
-[0-9]*[.][0-9]+[a-zA-Z_.]+                 {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(1); }
-[0-9]+[.][a-zA-Z_.]+                       {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(1); }
+[0-9]*[.][0-9]+[a-zA-Z_.]+                 {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(-1); }
+[0-9]+[.][a-zA-Z_.]+                       {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(-1); }
 [0-9]*[.][0-9]+                            {printToken("double"); putInBuffer(yytext); return double_constant; }
 [0-9]+[.]                                  {printToken("double"); putInBuffer(yytext); return double_constant; }
-[0-9]*[.][0-9]+[eE][+-]?[0-9]+[a-zA-Z_.]+  {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(1); }
-[0-9]+[.][eE][+-]?[0-9]+[a-zA-Z_.]+        {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(1); }
-[0-9]+[eE][+-]?[0-9]+[a-zA-Z_.]+           {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(1); }
+[0-9]*[.][0-9]+[eE][+-]?[0-9]+[a-zA-Z_.]+  {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(-1); }
+[0-9]+[.][eE][+-]?[0-9]+[a-zA-Z_.]+        {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(-1); }
+[0-9]+[eE][+-]?[0-9]+[a-zA-Z_.]+           {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(-1); }
 [0-9]*[.][0-9]+[eE][+-]?[0-9]+             {printToken("sci"); putInBuffer(yytext); return other_constant; }
 [0-9]+[.][eE][+-]?[0-9]+                   {printToken("sci"); putInBuffer(yytext); return other_constant; }
 [0-9]+[eE][+-]?[0-9]+                      {printToken("sci"); putInBuffer(yytext); return other_constant; }
 [']\\n[']                            {printToken("char"); putInBuffer(yytext); return char_constant; }
 [']\\t[']                            {printToken("char"); putInBuffer(yytext); return char_constant; }
-[']\\[']                             {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(1); }
-[0-9a-zA-Z_.]+['].[']                {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(1); }
-['].['][0-9a-zA-Z_.]+                {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(1); }
+[']\\[']                             {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(-1); }
+[0-9a-zA-Z_.]+['].[']                {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(-1); }
+['].['][0-9a-zA-Z_.]+                {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(-1); }
 ['].[']                              {printToken("char"); putInBuffer(yytext); return char_constant; }
-[0-9a-zA-Z_.]["].*["]                {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(1); }
-["].*["][0-9a-zA-Z_.]                {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(1); }
+[0-9a-zA-Z_.]["].*["]                {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(-1); }
+["].*["][0-9a-zA-Z_.]                {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(-1); }
 \"                                   {if (tokenOn) printf("#string:"); putInBuffer(yytext); quoteMatched = 0; BEGIN STRING; }
 <STRING>\"                           {if (tokenOn) printf("\n"); putInBuffer(yytext); quoteMatched = 1; BEGIN 0; return other_constant; }
 <STRING>\\n                          {if (tokenOn) ECHO; putInBuffer(yytext); }
 <STRING>\\t                          {if (tokenOn) ECHO; putInBuffer(yytext); }
-<STRING>\\                           {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(1); }
-<STRING>\n                           {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(1); }
+<STRING>\\                           {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(-1); }
+<STRING>\n                           {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(-1); }
 <STRING>.                            {if (tokenOn) ECHO; putInBuffer(yytext); }
 
 "//"                {putInBuffer(yytext); BEGIN COMMENT_ONE; }
@@ -174,14 +174,14 @@ perror      {printToken("key"); putInBuffer(yytext); return id; }
 " "                 {putInBuffer(yytext); }
 \t                  {putInBuffer(yytext); }
 \n                  {printAndInit(); lineNum++; }
-.                   {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(1); }
+.                   {fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext); exit(-1); }
 %%
 
 /*int main(int argc, char *argv[]) {
     yylex();
     if (commentMatched == 0 || quoteMatched == 0) {
         fprintf(stderr, "Error at line %d: %s\n", lineNum, yytext);
-        exit(1);
+        exit(-1);
     }
     return 0;
 }*/

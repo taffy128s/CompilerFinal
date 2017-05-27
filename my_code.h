@@ -3,6 +3,8 @@
 #define FUNC 1
 #define VAR 2
 #define CONST 3
+#define MINUS 1
+#define PLUS 2
 
 struct symbol_entry {
     char *name;
@@ -13,7 +15,8 @@ struct symbol_entry {
     int para_type[64];
     int para_num;
     int defined_function;
-    int status;
+	int try_to_invoke;
+    int status; // VAR, FUNC, CONST
     int var_offset;
 } table[MAX_TABLE_SIZE];
 
