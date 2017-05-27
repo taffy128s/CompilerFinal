@@ -1585,7 +1585,7 @@ void gen_assembly_header() {
 }
 
 void gen_assembly_tail() {
-    fprintf(f_asm, "    .ident    \"REDUCED GCC: (2017-05-21_taffy_compiler) 1.0.1\"\n");
+    fprintf(f_asm, "    .ident    \"REDUCED GCC: (2017-05-28_taffy_compiler) 1.0.1\"\n");
     fprintf(f_asm, "    ! ------------------------------------\n");
 }
 
