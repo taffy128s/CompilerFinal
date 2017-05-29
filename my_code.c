@@ -30,7 +30,7 @@ void install_symbol(char *s, int status) {
         fprintf(stderr, "Symbol table is full.\n");
     } else {
         table[cur_counter].name = copys(s);
-        table[cur_counter].label_name = 0;
+        table[cur_counter].label_name = NULL;
         table[cur_counter].type = now_dec_type;
         table[cur_counter].scope = cur_scope;
         table[cur_counter].para_num = 0;

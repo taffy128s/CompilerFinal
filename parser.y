@@ -191,11 +191,13 @@ func : non_void_type id
      ;
 
 dec_or_def : {
-                 int is_declared = have_declared(now_func_id);
+                 int is_declared = have_declared(now_func_id), index;
                  if (is_declared == 1) {
                      fprintf(stderr, "Error at line %d: multiple declaration.\n", lineNum);
                      exit(-1);
                  }
+                 index = look_up_symbol(now_func_id);
+                 table[index].label_name = gen_label();
              }
              ';'
            | {
@@ -240,14 +242,18 @@ dec_or_def : {
                      now_gen = GEN_TEXT;
                      fprintf(f_asm, "    .text\n");
                  }
-                 now_label = gen_label();
+                 index = look_up_symbol(now_func_id);
+                 if (table[index].label_name == NULL) {
+                     now_label = gen_label();
+                 } else {
+                     now_label = table[index].label_name;
+                 }
                  fprintf(f_asm, "    .align    1\n");
                  fprintf(f_asm, "    .global    %s\n", now_label);
                  fprintf(f_asm, "    .type    %s, @function\n", now_label);
                  fprintf(f_asm, "%s:\n", now_label);
                  fprintf(f_asm, "    push.s    { $lp }\n");
                  fprintf(f_asm, "    addi    $sp, $sp, -400\n");
-                 index = look_up_symbol(now_func_id);
                  table[index].label_name = now_label;
                  table[index].defined_function = 1;
                  for (i = 0; i < table[index].para_num; i++) {
