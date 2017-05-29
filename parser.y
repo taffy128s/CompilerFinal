@@ -40,9 +40,9 @@ int while_label_depth = -1;     // "while" label depth
 int switch_depth = -1;          // "switch" depth
 int logic_label_used = 0;       // "logic" label used
 int last_is_return = 0;         // last statment is return
-char *list_to_add_sub[128];        // list to add or sub after expr/expr_with_no_func_call
-int op_of_add_sub[128];            // to add or sub
-int num_to_add_sub;                // number to add or sub after expr/expr_with_no_func_call
+char *list_to_add_sub[128];     // list to add or sub after expr/expr_with_no_func_call
+int op_of_add_sub[128];         // to add or sub
+int num_to_add_sub;             // number to add or sub after expr/expr_with_no_func_call
 FILE *f_asm;                    // output file descriptor
 /*
     self-defined functions
