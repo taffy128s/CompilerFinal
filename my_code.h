@@ -15,7 +15,7 @@ struct symbol_entry {
     int para_type[64];
     int para_num;
     int defined_function;
-	int try_to_invoke;
+    int try_to_invoke;
     int status; // VAR, FUNC, CONST
     int var_offset;
 } table[MAX_TABLE_SIZE];

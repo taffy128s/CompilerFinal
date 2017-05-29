@@ -40,9 +40,9 @@ int while_label_depth = -1;     // "while" label depth
 int switch_depth = -1;          // "switch" depth
 int logic_label_used = 0;       // "logic" label used
 int last_is_return = 0;         // last statment is return
-char *list_to_add_sub[128];		// list to add or sub after expr/expr_with_no_func_call
-int op_of_add_sub[128];			// to add or sub
-int num_to_add_sub;				// number to add or sub after expr/expr_with_no_func_call
+char *list_to_add_sub[128];        // list to add or sub after expr/expr_with_no_func_call
+int op_of_add_sub[128];            // to add or sub
+int num_to_add_sub;                // number to add or sub after expr/expr_with_no_func_call
 FILE *f_asm;                    // output file descriptor
 /*
     self-defined functions
@@ -87,14 +87,14 @@ char *gen_label() {
 %token while_key do_key for_key
 %token continue_key break_key return_key
 %union {
-	int integer;
+    int integer;
     char *ident;
-	struct _expr_element_ {
-		int type;
-		int val;
-		int is_id;
-		char *name;
-	} expr_element;
+    struct _expr_element_ {
+        int type;
+        int val;
+        int is_id;
+        char *name;
+    } expr_element;
 }
 
 %type <integer> int_constant
@@ -114,11 +114,11 @@ char *gen_label() {
 
 program : glo_defs
           {
-	          char *not_define_func_name = (char *) check_func_not_defined();
-			  if (not_define_func_name != NULL) {
-				  fprintf(stderr, "Error at line %d: need to define function %s because it's invoked.\n", lineNum, not_define_func_name);
+              char *not_define_func_name = (char *) check_func_not_defined();
+              if (not_define_func_name != NULL) {
+                  fprintf(stderr, "Error at line %d: need to define function %s because it's invoked.\n", lineNum, not_define_func_name);
                   exit(-1);
-			  }
+              }
           }
         ;
 
@@ -350,7 +350,7 @@ statement : id
                     fprintf(f_asm, "    lwi    $r%d, [$sp + (%d)]\n", i, now_stack_pos);
                 }
                 fprintf(f_asm, "    bal %s\n", table[index].label_name);
-				table[index].try_to_invoke = 1;
+                table[index].try_to_invoke = 1;
                 last_is_return = 0;
             }
           | id '=' before_expr expr after_expr ';'
@@ -737,15 +737,15 @@ single_one : id
                  index = look_up_symbol($1);
                  if (table[index].scope == 0) {
                      fprintf(f_asm, "    .global %s\n", $1);
-					 if (now_gen != GEN_DATA) {
-						 now_gen = GEN_DATA;
-						 fprintf(f_asm, "    .data\n");
-					 }
-					 fprintf(f_asm, "    .align    2\n");
-					 fprintf(f_asm, "    .type    %s, @object\n", $1);
-					 fprintf(f_asm, "    .size    %s, 4\n", $1);
-					 fprintf(f_asm, "%s:\n", $1);
-					 fprintf(f_asm, "    .word    %d\n", $4.val);
+                     if (now_gen != GEN_DATA) {
+                         now_gen = GEN_DATA;
+                         fprintf(f_asm, "    .data\n");
+                     }
+                     fprintf(f_asm, "    .align    2\n");
+                     fprintf(f_asm, "    .type    %s, @object\n", $1);
+                     fprintf(f_asm, "    .size    %s, 4\n", $1);
+                     fprintf(f_asm, "%s:\n", $1);
+                     fprintf(f_asm, "    .word    %d\n", $4.val);
                  } else {
                      now_stack_pos += 4;
                      fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
@@ -756,50 +756,50 @@ single_one : id
            ;
 
 before_expr : {
-	              num_to_add_sub = 0;
+                  num_to_add_sub = 0;
               }
             ;
-			
+            
 after_expr : {
-	             int i, index;
-				 for (i = 0; i < num_to_add_sub; i++) {
-					 index = look_up_symbol(list_to_add_sub[i]);
-					 if (index == -1) {
-						 fprintf(stderr, "Some error occured at after_expr.\n");
-						 exit(-1);
-					 }
-					 if (table[index].status != VAR) {
+                 int i, index;
+                 for (i = 0; i < num_to_add_sub; i++) {
+                     index = look_up_symbol(list_to_add_sub[i]);
+                     if (index == -1) {
+                         fprintf(stderr, "Some error occured at after_expr.\n");
+                         exit(-1);
+                     }
+                     if (table[index].status != VAR) {
                          fprintf(stderr, "Error at line %d: cannot assign value to a non-var id.\n", lineNum);
                          exit(-1);
                      }
-					 if (op_of_add_sub[i] == PLUS) {
-						 if (table[index].scope == 0) {
-							 fprintf(f_asm, "    lwi.gp    $r0, [ + %s]\n", table[index].name);
-							 fprintf(f_asm, "    addi    $r0, $r0, 1\n");
-							 fprintf(f_asm, "    swi.gp    $r0, [ + %s]\n", table[index].name);
-						 } else {
-							 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", table[index].var_offset * 4);
-							 fprintf(f_asm, "    addi    $r0, $r0, 1\n");
-							 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", table[index].var_offset * 4);
-						 }
-					 } else if (op_of_add_sub[i] == MINUS) {
-						 if (table[index].scope == 0) {
-							 fprintf(f_asm, "    lwi.gp    $r0, [ + %s]\n", table[index].name);
-							 fprintf(f_asm, "    addi    $r0, $r0, -1\n");
-							 fprintf(f_asm, "    swi.gp    $r0, [ + %s]\n", table[index].name);
-						 } else {
-							 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", table[index].var_offset * 4);
-							 fprintf(f_asm, "    addi    $r0, $r0, -1\n");
-							 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", table[index].var_offset * 4);
-						 }
-					 } else {
-						 fprintf(stderr, "Some error occured at after_expr.\n");
-						 exit(-1);
-					 }
-				 }
+                     if (op_of_add_sub[i] == PLUS) {
+                         if (table[index].scope == 0) {
+                             fprintf(f_asm, "    lwi.gp    $r0, [ + %s]\n", table[index].name);
+                             fprintf(f_asm, "    addi    $r0, $r0, 1\n");
+                             fprintf(f_asm, "    swi.gp    $r0, [ + %s]\n", table[index].name);
+                         } else {
+                             fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", table[index].var_offset * 4);
+                             fprintf(f_asm, "    addi    $r0, $r0, 1\n");
+                             fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", table[index].var_offset * 4);
+                         }
+                     } else if (op_of_add_sub[i] == MINUS) {
+                         if (table[index].scope == 0) {
+                             fprintf(f_asm, "    lwi.gp    $r0, [ + %s]\n", table[index].name);
+                             fprintf(f_asm, "    addi    $r0, $r0, -1\n");
+                             fprintf(f_asm, "    swi.gp    $r0, [ + %s]\n", table[index].name);
+                         } else {
+                             fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", table[index].var_offset * 4);
+                             fprintf(f_asm, "    addi    $r0, $r0, -1\n");
+                             fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", table[index].var_offset * 4);
+                         }
+                     } else {
+                         fprintf(stderr, "Some error occured at after_expr.\n");
+                         exit(-1);
+                     }
+                 }
              }
            ;
-		   
+           
 expr : expr or_or expr
        {
            now_stack_pos += 4;
@@ -818,7 +818,7 @@ expr : expr or_or expr
            now_stack_pos -= 4;
            logic_label_used += 3;
            $$.type = int_type;
-		   $$.is_id = 0;
+           $$.is_id = 0;
        }
      | expr and_and expr
        {
@@ -837,7 +837,7 @@ expr : expr or_or expr
            now_stack_pos -= 4;
            logic_label_used += 2;
            $$.type = int_type;
-		   $$.is_id = 0;
+           $$.is_id = 0;
        }
      | '!' expr
        {
@@ -847,8 +847,8 @@ expr : expr or_or expr
            fprintf(f_asm, "    zeb    $r0, $r0\n");
            fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
            now_stack_pos -= 4;  
-		   $$.type = int_type;
-		   $$.is_id = 0;
+           $$.type = int_type;
+           $$.is_id = 0;
        }
      | expr '<' expr
        {
@@ -863,8 +863,8 @@ expr : expr or_or expr
                fprintf(stderr, "Error at line %d: type not matched.\n", lineNum);
                exit(-1);  
            }
-		   $$.type = $1.type;
-		   $$.is_id = 0;
+           $$.type = $1.type;
+           $$.is_id = 0;
        }
      | expr '>' expr
        {
@@ -880,7 +880,7 @@ expr : expr or_or expr
                exit(-1);  
            }
            $$.type = $1.type;
-		   $$.is_id = 0;
+           $$.is_id = 0;
        }
      | expr less_equal expr
        {
@@ -897,7 +897,7 @@ expr : expr or_or expr
                exit(-1);  
            }
            $$.type = $1.type;
-		   $$.is_id = 0;
+           $$.is_id = 0;
        }
      | expr bigger_equal expr
        {
@@ -914,7 +914,7 @@ expr : expr or_or expr
                exit(-1);  
            }
            $$.type = $1.type;
-		   $$.is_id = 0;
+           $$.is_id = 0;
        }
      | expr equal_equal expr
        {
@@ -932,7 +932,7 @@ expr : expr or_or expr
                exit(-1);  
            }
            $$.type = $1.type;
-		   $$.is_id = 0;
+           $$.is_id = 0;
        }
      | expr not_equal expr
        {
@@ -951,7 +951,7 @@ expr : expr or_or expr
                exit(-1);  
            }
            $$.type = $1.type;
-		   $$.is_id = 0;
+           $$.is_id = 0;
        }
      | expr '+' expr
        {
@@ -967,7 +967,7 @@ expr : expr or_or expr
                exit(-1);  
            }
            $$.type = $1.type;
-		   $$.is_id = 0;
+           $$.is_id = 0;
        }
      | expr '-' expr
        {
@@ -983,7 +983,7 @@ expr : expr or_or expr
                exit(-1);  
            }
            $$.type = $1.type;
-		   $$.is_id = 0;
+           $$.is_id = 0;
        }
      | expr '*' expr
        {
@@ -999,7 +999,7 @@ expr : expr or_or expr
                exit(-1);  
            }
            $$.type = $1.type;
-		   $$.is_id = 0;
+           $$.is_id = 0;
        }
      | expr '/' expr
        {
@@ -1015,7 +1015,7 @@ expr : expr or_or expr
                exit(-1);  
            }
            $$.type = $1.type;
-		   $$.is_id = 0;
+           $$.is_id = 0;
        }
      | expr '%' expr
        {
@@ -1031,7 +1031,7 @@ expr : expr or_or expr
                exit(-1);  
            }
            $$.type = $1.type;
-		   $$.is_id = 0;
+           $$.is_id = 0;
        }
      | '-' expr %prec uminus
        {
@@ -1042,31 +1042,31 @@ expr : expr or_or expr
            fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
            now_stack_pos -= 4;  
            $$.type = $2.type;
-		   $$.is_id = 0;
+           $$.is_id = 0;
        }
      | expr plus_plus
        {
            if ($1.is_id) {
-		       op_of_add_sub[num_to_add_sub] = PLUS;
-			   list_to_add_sub[num_to_add_sub++] = $1.name;
-		   } else {
-			   fprintf(stderr, "Error at line %d: not allowed calculation.\n", lineNum);
+               op_of_add_sub[num_to_add_sub] = PLUS;
+               list_to_add_sub[num_to_add_sub++] = $1.name;
+           } else {
+               fprintf(stderr, "Error at line %d: not allowed calculation.\n", lineNum);
                exit(-1);
-		   }
-		   $$.type = $1.type;
-		   $$.is_id = 0;
+           }
+           $$.type = $1.type;
+           $$.is_id = 0;
        }
      | expr minus_minus
        {
            if ($1.is_id) {
-		       op_of_add_sub[num_to_add_sub] = MINUS;
-			   list_to_add_sub[num_to_add_sub++] = $1.name;
-		   } else {
-			   fprintf(stderr, "Error at line %d: not allowed calculation.\n", lineNum);
+               op_of_add_sub[num_to_add_sub] = MINUS;
+               list_to_add_sub[num_to_add_sub++] = $1.name;
+           } else {
+               fprintf(stderr, "Error at line %d: not allowed calculation.\n", lineNum);
                exit(-1);
-		   }
-		   $$.type = $1.type;
-		   $$.is_id = 0;
+           }
+           $$.type = $1.type;
+           $$.is_id = 0;
        }
      | id
        {
@@ -1088,9 +1088,9 @@ expr : expr or_or expr
                fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
                now_stack_pos -= 4;
            }
-		   $$.type = table[index].type;
-		   $$.is_id = 1;
-		   $$.name = (char *) copys($1);
+           $$.type = table[index].type;
+           $$.is_id = 1;
+           $$.name = (char *) copys($1);
        }
      | id arr_dim_expr
        {
@@ -1103,7 +1103,7 @@ expr : expr or_or expr
            fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
            now_stack_pos -= 4;
            $$.type = int_type;
-		   $$.is_id = 0;
+           $$.is_id = 0;
        }
      | char_constant
        {
@@ -1113,7 +1113,7 @@ expr : expr or_or expr
      | double_constant
        {
            $$.type = double_type;
-		   $$.is_id = 0;
+           $$.is_id = 0;
        }
      | other_constant
        {
@@ -1155,338 +1155,338 @@ expr : expr or_or expr
            fprintf(f_asm, "    bal %s\n", table[index].label_name);
            fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
            now_stack_pos -= 4;
-		   table[index].try_to_invoke = 1;
+           table[index].try_to_invoke = 1;
            $$.type = table[index].type;
-		   $$.is_id = 0;
+           $$.is_id = 0;
        }
      | '(' expr ')'
        {
            $$.type = $2.type;
-		   $$.is_id = $2.is_id;
-		   $$.name = $2.name;
+           $$.is_id = $2.is_id;
+           $$.name = $2.name;
        }
      ;
 
 expr_with_no_func_call : expr_with_no_func_call or_or expr_with_no_func_call
                          {
-							 if (cur_scope > 0) {
-								 now_stack_pos += 4;
-								 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 fprintf(f_asm, "    bnez    $r0, .L%d\n", logic_label_used);
-								 now_stack_pos += 4;
-								 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 fprintf(f_asm, "    beqz    $r0, .L%d\n", logic_label_used + 1);
-								 fprintf(f_asm, ".L%d:\n", logic_label_used);
-								 fprintf(f_asm, "    movi    $r0, 1\n");
-								 fprintf(f_asm, "    j    .L%d\n", logic_label_used + 2);
-								 fprintf(f_asm, ".L%d:\n", logic_label_used + 1);
-								 fprintf(f_asm, "    movi    $r0, 0\n");
-								 fprintf(f_asm, ".L%d:\n", logic_label_used + 2);
-								 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 now_stack_pos -= 4;
-								 logic_label_used += 3;
-							 }
+                             if (cur_scope > 0) {
+                                 now_stack_pos += 4;
+                                 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 fprintf(f_asm, "    bnez    $r0, .L%d\n", logic_label_used);
+                                 now_stack_pos += 4;
+                                 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 fprintf(f_asm, "    beqz    $r0, .L%d\n", logic_label_used + 1);
+                                 fprintf(f_asm, ".L%d:\n", logic_label_used);
+                                 fprintf(f_asm, "    movi    $r0, 1\n");
+                                 fprintf(f_asm, "    j    .L%d\n", logic_label_used + 2);
+                                 fprintf(f_asm, ".L%d:\n", logic_label_used + 1);
+                                 fprintf(f_asm, "    movi    $r0, 0\n");
+                                 fprintf(f_asm, ".L%d:\n", logic_label_used + 2);
+                                 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 now_stack_pos -= 4;
+                                 logic_label_used += 3;
+                             }
                              $$.type = int_type;
-							 $$.is_id = 0;
-							 $$.val = ($1.val || $3.val);
+                             $$.is_id = 0;
+                             $$.val = ($1.val || $3.val);
                          }
                        | expr_with_no_func_call and_and expr_with_no_func_call
                          {
-							 if (cur_scope > 0) {
-								 now_stack_pos += 4;
-								 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 fprintf(f_asm, "    beqz    $r0, .L%d\n", logic_label_used);
-								 now_stack_pos += 4;
-								 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 fprintf(f_asm, "    beqz    $r0, .L%d\n", logic_label_used);
-								 fprintf(f_asm, "    movi    $r0, 1\n");
-								 fprintf(f_asm, "    j    .L%d\n", logic_label_used + 1);
-								 fprintf(f_asm, ".L%d:\n", logic_label_used);
-								 fprintf(f_asm, "    movi    $r0, 0\n");
-								 fprintf(f_asm, ".L%d:\n", logic_label_used + 1);
-								 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 now_stack_pos -= 4;
-								 logic_label_used += 2;
-							 }
+                             if (cur_scope > 0) {
+                                 now_stack_pos += 4;
+                                 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 fprintf(f_asm, "    beqz    $r0, .L%d\n", logic_label_used);
+                                 now_stack_pos += 4;
+                                 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 fprintf(f_asm, "    beqz    $r0, .L%d\n", logic_label_used);
+                                 fprintf(f_asm, "    movi    $r0, 1\n");
+                                 fprintf(f_asm, "    j    .L%d\n", logic_label_used + 1);
+                                 fprintf(f_asm, ".L%d:\n", logic_label_used);
+                                 fprintf(f_asm, "    movi    $r0, 0\n");
+                                 fprintf(f_asm, ".L%d:\n", logic_label_used + 1);
+                                 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 now_stack_pos -= 4;
+                                 logic_label_used += 2;
+                             }
                              $$.type = int_type;
-							 $$.is_id = 0;
-							 $$.val = ($1.val && $3.val);
+                             $$.is_id = 0;
+                             $$.val = ($1.val && $3.val);
                          }
                        | '!' expr_with_no_func_call 
                          {
-							 if (cur_scope > 0) {
-								 now_stack_pos += 4;
-								 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 fprintf(f_asm, "    slti    $r0, $r0, 1\n");
-								 fprintf(f_asm, "    zeb    $r0, $r0\n");
-								 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 now_stack_pos -= 4;
-							 }
+                             if (cur_scope > 0) {
+                                 now_stack_pos += 4;
+                                 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 fprintf(f_asm, "    slti    $r0, $r0, 1\n");
+                                 fprintf(f_asm, "    zeb    $r0, $r0\n");
+                                 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 now_stack_pos -= 4;
+                             }
                              $$.type = int_type;
-							 $$.is_id = 0;
-							 $$.val = !($2.val);
+                             $$.is_id = 0;
+                             $$.val = !($2.val);
                          }
                        | expr_with_no_func_call '<' expr_with_no_func_call
                          {
-							 if (cur_scope > 0) {
-								 now_stack_pos += 4;
-								 fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
-								 now_stack_pos += 4;
-								 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 fprintf(f_asm, "    slts    $r0, $r0, $r1\n");
-								 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 now_stack_pos -= 4;
-							 }
+                             if (cur_scope > 0) {
+                                 now_stack_pos += 4;
+                                 fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
+                                 now_stack_pos += 4;
+                                 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 fprintf(f_asm, "    slts    $r0, $r0, $r1\n");
+                                 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 now_stack_pos -= 4;
+                             }
                              if ($1.type != $3.type) {
                                  fprintf(stderr, "Error at line %d: type not matched.\n", lineNum);
                                  exit(-1);  
                              }
                              $$.type = $1.type;
-							 $$.is_id = 0;
-							 $$.val = ($1.val < $3.val);
+                             $$.is_id = 0;
+                             $$.val = ($1.val < $3.val);
                          }
                        | expr_with_no_func_call '>' expr_with_no_func_call
                          {
-							 if (cur_scope > 0) {
-								 now_stack_pos += 4;
-								 fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
-								 now_stack_pos += 4;
-								 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 fprintf(f_asm, "    slts    $r0, $r1, $r0\n");
-								 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 now_stack_pos -= 4; 
-							 }
+                             if (cur_scope > 0) {
+                                 now_stack_pos += 4;
+                                 fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
+                                 now_stack_pos += 4;
+                                 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 fprintf(f_asm, "    slts    $r0, $r1, $r0\n");
+                                 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 now_stack_pos -= 4; 
+                             }
                              if ($1.type != $3.type) {
                                  fprintf(stderr, "Error at line %d: type not matched.\n", lineNum);
                                  exit(-1);  
                              }
                              $$.type = $1.type;
-							 $$.is_id = 0;
-							 $$.val = ($1.val > $3.val);
+                             $$.is_id = 0;
+                             $$.val = ($1.val > $3.val);
                          }
                        | expr_with_no_func_call less_equal expr_with_no_func_call
                          {
-							 if (cur_scope > 0) {
-								 now_stack_pos += 4;
-								 fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
-								 now_stack_pos += 4;
-								 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 fprintf(f_asm, "    slts    $r0, $r1, $r0\n");
-								 fprintf(f_asm, "    xori    $r0, $r0, 1\n");
-								 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 now_stack_pos -= 4;
-							 }
+                             if (cur_scope > 0) {
+                                 now_stack_pos += 4;
+                                 fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
+                                 now_stack_pos += 4;
+                                 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 fprintf(f_asm, "    slts    $r0, $r1, $r0\n");
+                                 fprintf(f_asm, "    xori    $r0, $r0, 1\n");
+                                 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 now_stack_pos -= 4;
+                             }
                              if ($1.type != $3.type) {
                                  fprintf(stderr, "Error at line %d: type not matched.\n", lineNum);
                                  exit(-1);  
                              }
                              $$.type = $1.type;
-							 $$.is_id = 0;
-							 $$.val = ($1.val <= $3.val);
+                             $$.is_id = 0;
+                             $$.val = ($1.val <= $3.val);
                          }
                        | expr_with_no_func_call bigger_equal expr_with_no_func_call
                          {
-							 if (cur_scope > 0) {
-								 now_stack_pos += 4;
-								 fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
-								 now_stack_pos += 4;
-								 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 fprintf(f_asm, "    slts    $r0, $r0, $r1\n");
-								 fprintf(f_asm, "    xori    $r0, $r0, 1\n");
-								 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 now_stack_pos -= 4;
-							 }
+                             if (cur_scope > 0) {
+                                 now_stack_pos += 4;
+                                 fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
+                                 now_stack_pos += 4;
+                                 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 fprintf(f_asm, "    slts    $r0, $r0, $r1\n");
+                                 fprintf(f_asm, "    xori    $r0, $r0, 1\n");
+                                 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 now_stack_pos -= 4;
+                             }
                              if ($1.type != $3.type) {
                                  fprintf(stderr, "Error at line %d: type not matched.\n", lineNum);
                                  exit(-1);  
                              }
                              $$.type = $1.type;
-							 $$.is_id = 0;
-							 $$.val = ($1.val >= $3.val);
+                             $$.is_id = 0;
+                             $$.val = ($1.val >= $3.val);
                          }
                        | expr_with_no_func_call equal_equal expr_with_no_func_call
                          {
-							 if (cur_scope > 0) {
-								 now_stack_pos += 4;
-								 fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
-								 now_stack_pos += 4;
-								 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 fprintf(f_asm, "    sub    $r0, $r0, $r1\n");
-								 fprintf(f_asm, "    slti    $r0, $r0, 1\n");
-								 fprintf(f_asm, "    zeb    $r0, $r0\n");
-								 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 now_stack_pos -= 4;
-							 }
+                             if (cur_scope > 0) {
+                                 now_stack_pos += 4;
+                                 fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
+                                 now_stack_pos += 4;
+                                 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 fprintf(f_asm, "    sub    $r0, $r0, $r1\n");
+                                 fprintf(f_asm, "    slti    $r0, $r0, 1\n");
+                                 fprintf(f_asm, "    zeb    $r0, $r0\n");
+                                 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 now_stack_pos -= 4;
+                             }
                              if ($1.type != $3.type) {
                                  fprintf(stderr, "Error at line %d: type not matched.\n", lineNum);
                                  exit(-1);  
                              }
                              $$.type = $1.type;
-							 $$.is_id = 0;
-							 $$.val = ($1.val == $3.val);
+                             $$.is_id = 0;
+                             $$.val = ($1.val == $3.val);
                          }
                        | expr_with_no_func_call not_equal expr_with_no_func_call
                          {
-							 if (cur_scope > 0) {
-								 now_stack_pos += 4;
-								 fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
-								 now_stack_pos += 4;
-								 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 fprintf(f_asm, "    sub    $r0, $r0, $r1\n");
-								 fprintf(f_asm, "    movi    $r1, 0\n");
-								 fprintf(f_asm, "    slt    $r0, $r1, $r0\n");
-								 fprintf(f_asm, "    zeb    $r0, $r0\n");
-								 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 now_stack_pos -= 4;
-							 }
+                             if (cur_scope > 0) {
+                                 now_stack_pos += 4;
+                                 fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
+                                 now_stack_pos += 4;
+                                 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 fprintf(f_asm, "    sub    $r0, $r0, $r1\n");
+                                 fprintf(f_asm, "    movi    $r1, 0\n");
+                                 fprintf(f_asm, "    slt    $r0, $r1, $r0\n");
+                                 fprintf(f_asm, "    zeb    $r0, $r0\n");
+                                 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 now_stack_pos -= 4;
+                             }
                              if ($1.type != $3.type) {
                                  fprintf(stderr, "Error at line %d: type not matched.\n", lineNum);
                                  exit(-1);  
                              }
                              $$.type = $1.type;
-							 $$.is_id = 0;
-							 $$.val = ($1.val != $3.val);
+                             $$.is_id = 0;
+                             $$.val = ($1.val != $3.val);
                          }
                        | expr_with_no_func_call '+' expr_with_no_func_call
                          {
-							 if (cur_scope > 0) {
-								 now_stack_pos += 4;
-								 fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
-								 now_stack_pos += 4;
-								 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 fprintf(f_asm, "    add    $r0, $r0, $r1\n");
-								 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 now_stack_pos -= 4;
-							 }
+                             if (cur_scope > 0) {
+                                 now_stack_pos += 4;
+                                 fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
+                                 now_stack_pos += 4;
+                                 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 fprintf(f_asm, "    add    $r0, $r0, $r1\n");
+                                 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 now_stack_pos -= 4;
+                             }
                              if ($1.type != $3.type) {
                                  fprintf(stderr, "Error at line %d: type not matched.\n", lineNum);
                                  exit(-1);  
                              }
                              $$.type = $1.type;
-							 $$.is_id = 0;
-							 $$.val = ($1.val + $3.val);
+                             $$.is_id = 0;
+                             $$.val = ($1.val + $3.val);
                          }
                        | expr_with_no_func_call '-' expr_with_no_func_call
                          {
-							 if (cur_scope > 0) {
-								 now_stack_pos += 4;
-								 fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
-								 now_stack_pos += 4;
-								 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 fprintf(f_asm, "    sub    $r0, $r0, $r1\n");
-								 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 now_stack_pos -= 4;
-							 }
+                             if (cur_scope > 0) {
+                                 now_stack_pos += 4;
+                                 fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
+                                 now_stack_pos += 4;
+                                 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 fprintf(f_asm, "    sub    $r0, $r0, $r1\n");
+                                 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 now_stack_pos -= 4;
+                             }
                              if ($1.type != $3.type) {
                                  fprintf(stderr, "Error at line %d: type not matched.\n", lineNum);
                                  exit(-1);  
                              }
                              $$.type = $1.type;
-							 $$.is_id = 0;
-							 $$.val = ($1.val - $3.val);
+                             $$.is_id = 0;
+                             $$.val = ($1.val - $3.val);
                          }
                        | expr_with_no_func_call '*' expr_with_no_func_call
                          {
-							 if (cur_scope) {
-								 now_stack_pos += 4;
-								 fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
-								 now_stack_pos += 4;
-								 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 fprintf(f_asm, "    mul    $r0, $r0, $r1\n");
-								 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 now_stack_pos -= 4;
-							 }
+                             if (cur_scope) {
+                                 now_stack_pos += 4;
+                                 fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
+                                 now_stack_pos += 4;
+                                 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 fprintf(f_asm, "    mul    $r0, $r0, $r1\n");
+                                 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 now_stack_pos -= 4;
+                             }
                              if ($1.type != $3.type) {
                                  fprintf(stderr, "Error at line %d: type not matched.\n", lineNum);
                                  exit(-1);  
                              }
                              $$.type = $1.type;
-							 $$.is_id = 0;
-							 $$.val = ($1.val * $3.val);
+                             $$.is_id = 0;
+                             $$.val = ($1.val * $3.val);
                          }
                        | expr_with_no_func_call '/' expr_with_no_func_call
                          {
-							 if (cur_scope > 0) {
-								 now_stack_pos += 4;
-								 fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
-								 now_stack_pos += 4;
-								 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 fprintf(f_asm, "    divsr    $r0, $r1, $r0, $r1\n");
-								 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 now_stack_pos -= 4;
-							 }
+                             if (cur_scope > 0) {
+                                 now_stack_pos += 4;
+                                 fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
+                                 now_stack_pos += 4;
+                                 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 fprintf(f_asm, "    divsr    $r0, $r1, $r0, $r1\n");
+                                 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 now_stack_pos -= 4;
+                             }
                              if ($1.type != $3.type) {
                                  fprintf(stderr, "Error at line %d: type not matched.\n", lineNum);
                                  exit(-1);  
                              }
                              $$.type = $1.type;
-							 $$.is_id = 0;
-							 $$.val = ($1.val / $3.val);
+                             $$.is_id = 0;
+                             $$.val = ($1.val / $3.val);
                          }
                        | expr_with_no_func_call '%' expr_with_no_func_call
                          {
-							 if (cur_scope > 0) {
-								 now_stack_pos += 4;
-								 fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
-								 now_stack_pos += 4;
-								 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 fprintf(f_asm, "    divsr    $r0, $r1, $r0, $r1\n");
-								 fprintf(f_asm, "    swi    $r1, [$sp + (%d)]\n", now_stack_pos);
-								 now_stack_pos -= 4;
-							 }
+                             if (cur_scope > 0) {
+                                 now_stack_pos += 4;
+                                 fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
+                                 now_stack_pos += 4;
+                                 fprintf(f_asm, "    lwi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 fprintf(f_asm, "    divsr    $r0, $r1, $r0, $r1\n");
+                                 fprintf(f_asm, "    swi    $r1, [$sp + (%d)]\n", now_stack_pos);
+                                 now_stack_pos -= 4;
+                             }
                              if ($1.type != $3.type) {
                                  fprintf(stderr, "Error at line %d: type not matched.\n", lineNum);
                                  exit(-1);  
                              }
                              $$.type = $1.type;
-							 $$.is_id = 0;
-							 $$.val = ($1.val % $3.val);
+                             $$.is_id = 0;
+                             $$.val = ($1.val % $3.val);
                          }
                        | '-' expr_with_no_func_call %prec uminus
                          {
-							 if (cur_scope > 0) {
-								 now_stack_pos += 4;
-								 fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
-								 fprintf(f_asm, "    movi    $r0, 0\n");
-								 fprintf(f_asm, "    sub    $r0, $r0, $r1\n");
-								 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 now_stack_pos -= 4;
-							 }
+                             if (cur_scope > 0) {
+                                 now_stack_pos += 4;
+                                 fprintf(f_asm, "    lwi    $r1, [$sp + (%d)]\n", now_stack_pos);
+                                 fprintf(f_asm, "    movi    $r0, 0\n");
+                                 fprintf(f_asm, "    sub    $r0, $r0, $r1\n");
+                                 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 now_stack_pos -= 4;
+                             }
                              $$.type = $2.type;
-							 $$.is_id = 0;
-							 $$.val = -$2.val;
+                             $$.is_id = 0;
+                             $$.val = -$2.val;
                          }
                        | expr_with_no_func_call plus_plus
                          {
-							 if (cur_scope == 0) {
-								 fprintf(stderr, "Error at line %d: not allowed calculation.\n", lineNum);
+                             if (cur_scope == 0) {
+                                 fprintf(stderr, "Error at line %d: not allowed calculation.\n", lineNum);
                                  exit(-1);  
-							 }
-							 if ($1.is_id) {
-								 op_of_add_sub[num_to_add_sub] = PLUS;
-								 list_to_add_sub[num_to_add_sub++] = $1.name;
-							 } else {
-								 fprintf(stderr, "Error at line %d: not allowed calculation.\n", lineNum);
+                             }
+                             if ($1.is_id) {
+                                 op_of_add_sub[num_to_add_sub] = PLUS;
+                                 list_to_add_sub[num_to_add_sub++] = $1.name;
+                             } else {
+                                 fprintf(stderr, "Error at line %d: not allowed calculation.\n", lineNum);
                                  exit(-1);
-							 }
-							 $$.type = $1.type;
-							 $$.is_id = 0;
+                             }
+                             $$.type = $1.type;
+                             $$.is_id = 0;
                          }
                        | expr_with_no_func_call minus_minus
                          {
-							 if (cur_scope == 0) {
-								 fprintf(stderr, "Error at line %d: not allowed calculation.\n", lineNum);
+                             if (cur_scope == 0) {
+                                 fprintf(stderr, "Error at line %d: not allowed calculation.\n", lineNum);
                                  exit(-1);  
-							 }
-							 if ($1.is_id) {
-								 op_of_add_sub[num_to_add_sub] = MINUS;
-								 list_to_add_sub[num_to_add_sub++] = $1.name;
-							 } else {
-								 fprintf(stderr, "Error at line %d: not allowed calculation.\n", lineNum);
+                             }
+                             if ($1.is_id) {
+                                 op_of_add_sub[num_to_add_sub] = MINUS;
+                                 list_to_add_sub[num_to_add_sub++] = $1.name;
+                             } else {
+                                 fprintf(stderr, "Error at line %d: not allowed calculation.\n", lineNum);
                                  exit(-1);
-							 }
-							 $$.type = $1.type;
-							 $$.is_id = 0;
+                             }
+                             $$.type = $1.type;
+                             $$.is_id = 0;
                          }
                        | id
                          {
@@ -1499,10 +1499,10 @@ expr_with_no_func_call : expr_with_no_func_call or_or expr_with_no_func_call
                                  fprintf(stderr, "Error at line %d: not allowed type.\n", lineNum);
                                  exit(-1);
                              }
-							 if (cur_scope == 0) {
-								 fprintf(stderr, "Error at line %d: can't use var in global scope.\n", lineNum);
+                             if (cur_scope == 0) {
+                                 fprintf(stderr, "Error at line %d: can't use var in global scope.\n", lineNum);
                                  exit(-1);
-							 }
+                             }
                              if (table[index].scope == 0) {
                                  fprintf(f_asm, "    lwi.gp    $r0, [ + %s]\n", table[index].name);
                                  fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
@@ -1513,8 +1513,8 @@ expr_with_no_func_call : expr_with_no_func_call or_or expr_with_no_func_call
                                  now_stack_pos -= 4;
                              }
                              $$.type = table[index].type;
-							 $$.is_id = 1;
-							 $$.name = (char *) copys($1);
+                             $$.is_id = 1;
+                             $$.name = (char *) copys($1);
                          }
                        | id arr_dim_expr_with_no_func_call
                          {
@@ -1523,14 +1523,14 @@ expr_with_no_func_call : expr_with_no_func_call or_or expr_with_no_func_call
                          }
                        | int_constant
                          {
-							 if (cur_scope > 0) {
-								 fprintf(f_asm, "    movi    $r0, %d\n", $1);
-								 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
-								 now_stack_pos -= 4;
-							 }
+                             if (cur_scope > 0) {
+                                 fprintf(f_asm, "    movi    $r0, %d\n", $1);
+                                 fprintf(f_asm, "    swi    $r0, [$sp + (%d)]\n", now_stack_pos);
+                                 now_stack_pos -= 4;
+                             }
                              $$.type = int_type;
-							 $$.is_id = 0;
-							 $$.val = $1;
+                             $$.is_id = 0;
+                             $$.val = $1;
                          }
                        | char_constant
                          {
@@ -1540,7 +1540,7 @@ expr_with_no_func_call : expr_with_no_func_call or_or expr_with_no_func_call
                        | double_constant
                          {
                              $$.type = double_type;
-							 $$.is_id = 0;
+                             $$.is_id = 0;
                          }
                        | other_constant
                          {
@@ -1550,9 +1550,9 @@ expr_with_no_func_call : expr_with_no_func_call or_or expr_with_no_func_call
                        | '(' expr_with_no_func_call ')'
                          {
                              $$.type = $2.type;
-							 $$.is_id = $2.is_id;
-							 $$.val = $2.val;
-							 $$.name = $2.name;
+                             $$.is_id = $2.is_id;
+                             $$.val = $2.val;
+                             $$.name = $2.name;
                          }
                        ;
 
@@ -1565,7 +1565,7 @@ void gen_assembly_header() {
     fprintf(f_asm, "    ! This asm file is generated by Taffy's compiler\n");
     fprintf(f_asm, "    .flag    verbatim\n");
     fprintf(f_asm, "    ! This vector size directive is required for checking inconsistency on interrupt handler\n");
-    fprintf(f_asm, "    .vec_size	16\n");
+    fprintf(f_asm, "    .vec_size    16\n");
     fprintf(f_asm, "    ! ------------------------------------\n");
     fprintf(f_asm, "    ! ISA family        : V3M\n");
     fprintf(f_asm, "    ! Pipeline model    : N8\n");
@@ -1596,27 +1596,27 @@ void gen_assembly_tail() {
 }
 
 void install_built_in_functions() {
-	int index;
-	//---//
+    int index;
+    //---//
     install_symbol("pinMode", FUNC);
     index = look_up_symbol("pinMode");
     table[index].para_type[table[index].para_num++] = int_type;
     table[index].para_type[table[index].para_num++] = int_type;
     table[index].label_name = (char *) copys("pinMode");
-	table[index].defined_function = 1;
+    table[index].defined_function = 1;
     //---//
     install_symbol("digitalWrite", FUNC);
     index = look_up_symbol("digitalWrite");
     table[index].para_type[table[index].para_num++] = int_type;
     table[index].para_type[table[index].para_num++] = int_type;
     table[index].label_name = (char *) copys("digitalWrite");
-	table[index].defined_function = 1;
+    table[index].defined_function = 1;
     //---//
     install_symbol("delay", FUNC);
     index = look_up_symbol("delay");
     table[index].para_type[table[index].para_num++] = int_type;
     table[index].label_name = (char *) copys("delay");
-	table[index].defined_function = 1;
+    table[index].defined_function = 1;
 }
 
 int main() {
@@ -1637,9 +1637,9 @@ int main() {
 }
 
 int yyerror(char *msg) {
-	fprintf(stderr, "______ Error at line %d: %s\n", lineNum, buffer);
-	fprintf(stderr, "\n" );
-	fprintf(stderr, "Unmatched token: %s\n", yytext);
-	fprintf(stderr, "______ syntax error\n");
-	exit(-1);
+    fprintf(stderr, "______ Error at line %d: %s\n", lineNum, buffer);
+    fprintf(stderr, "\n" );
+    fprintf(stderr, "Unmatched token: %s\n", yytext);
+    fprintf(stderr, "______ syntax error\n");
+    exit(-1);
 }
