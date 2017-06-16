@@ -99,7 +99,7 @@ char *gen_label() {
 
 %type <integer> int_constant
 %type <ident> id
-%type <expr_element> int_type double_type bool_type char_type void_type expr_with_no_func_call expr all_constant
+%type <expr_element> expr_with_no_func_call expr all_constant
 
 %left or_or
 %left and_and
@@ -602,7 +602,7 @@ const_list : const_list ',' const_single
 
 const_single : id '=' all_constant
                {
-                   int index = look_up_symbol($1);
+                   int index = check_dup($1);
                    if (index >= 0) {
                        fprintf(stderr, "Error at line %d: multiple definition.\n", lineNum);
                        exit(-1);
@@ -690,7 +690,7 @@ ini_seq : ini_seq ',' expr_with_no_func_call
 
 single_one : id
              {
-                 int index = look_up_symbol($1);
+                 int index = check_dup($1);
                  if (index >= 0) {
                      fprintf(stderr, "Error at line %d: multiple definition.\n", lineNum);
                      exit(-1);
@@ -721,7 +721,7 @@ single_one : id
              }
            | id '=' before_expr expr_with_no_func_call after_expr
              {
-                 int index = look_up_symbol($1);
+                 int index = check_dup($1);
                  if (index >= 0) {
                      fprintf(stderr, "Error at line %d: multiple definition.\n", lineNum);
                      exit(-1);

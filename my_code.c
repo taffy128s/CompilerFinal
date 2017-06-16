@@ -54,6 +54,18 @@ int look_up_symbol(char *s) {
     return -1;
 }
 
+int check_dup(char *s) {
+    int i;
+    if (cur_counter == 0) {
+        return -1;
+    }
+    for (i = cur_counter - 1; i >= 0, table[i].scope == cur_scope; i--) {
+        if (!strcmp(s, table[i].name))
+            return i;
+    }
+    return -1;
+}
+
 void pop_up_symbol(int scope) {
     int i;
     if (cur_counter == 0) return;
